@@ -10,7 +10,7 @@ from fabric.api import *
 # from kazoo.client import KazooState
 from kazoo.client import KazooClient
 
-logging.getLogger('kazoo.client').addHandler(logging.StreamHandler())
+# logging.getLogger('kazoo.client').addHandler(logging.StreamHandler())
 
 
 class SolrCloudManager:
@@ -56,8 +56,11 @@ class SolrCloudManager:
         return 0
 
     def _restart_host_solr_service(self, host):
-        restart_command = '/usr/bin/sudo /sbin/restart solr-undertow'
-        print 'Pretend to: ' + 'ssh ' + host + " '" + restart_command + "'"
+        # restart_command = '/usr/bin/sudo /sbin/restart solr-undertow'
+        print 'Restarting: %s' % (host)
+        result = sudo("echo '/sbin/restart solr-undertow'")
+        if result.failed:
+            return 1
         return 0
 
     def restart_host_solr(self, host, host_port='8983', force=False):
@@ -83,10 +86,15 @@ class SolrCloudManager:
     def _return_message(self, error_code, message):
         return {'status': error_code, 'message': message}
 
+env.zkhost = 'zookeeper-dev-1.build.internal:2181/solr/5.1.0/sandbox'
+env.host_port = '8983'
+env.force = False
+env.user = 'thartman'
+
 
 @task
 def solrRestart():
-    scman = SolrCloudManager(args.zkhost)
+    scman = SolrCloudManager(env.zkhost)
     # Only supports restart_host_solr operation
     results = scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force)
 
