@@ -22,8 +22,8 @@ def excludehosts(func):
     return wraps(func)(closuref)
 
 
+# @excludehosts
 @task
-@excludehosts
 def dashaction(screen_name, script, script_params=None):
     command = actionscript(script, script_params, True)
     # print("Running %s") % (command)
