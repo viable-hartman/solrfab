@@ -1,30 +1,93 @@
+#!/usr/bin/env python
+
 from __future__ import with_statement
+
 import json
 from fabric.api import *
-from fabric.colors import red, green
+# from fabric.colors import red, green
 # from fabric.contrib import files
-from functools import wraps
+# from functools import wraps
+# from kazoo.client import KazooState
+from kazoo.client import KazooClient
+
+logging.getLogger('kazoo.client').addHandler(logging.StreamHandler())
 
 
-def excludehosts(func):
-    def closuref(*args, **kwargs):
-        exhosts = json.loads(env.exhosts)
-        if exhosts:
-            print(green("Verifying host %s") % (env.host))
-            if any(env.host in s for s in exhosts):
-                print(green("Excluding host %s" % (env.host)))
-                return
-        return func(*args, **kwargs)
-    # This is necessary so that custom decorator is interpreted as fabric decorator
-    # Fabric fix: https://github.com/mvk/fabric/commit/68601ae817c5c26f4937f0d04cb56e2ba8ca1e04
-    # is also necessary.
-    closuref.func_dict['wrapped'] = func
-    return wraps(func)(closuref)
+class SolrCloudManager:
+    def __init__(self, zk_host):
+        self.__zk = KazooClient(hosts=zk_host)
+        self.__zk.start()
+
+    def __del__(self):
+        self.__zk.stop()
+
+    def get_cluster_state(self):
+        cs_tuple = self.__zk.retry(self.__zk.get, 'clusterstate.json')
+        cs = json.loads(cs_tuple[0])
+        return cs
+
+    # Check all replicas that contain node_name
+    # Return true if ALL nodes are in the active state
+    def replicas_are_active(self, node_name):
+        cluster_state = self.get_cluster_state()
+        active = True
+        for cn, cdata in cluster_state.iteritems():
+            for sn, sdata in cdata['shards'].iteritems():
+                replica_down = False
+                node_in_replica = False
+                for rn, rdata in sdata['replicas'].iteritems():
+                    if rdata['node_name'] == node_name:
+                        node_in_replica = True
+                    if rdata['state'] != "active":
+                        replica_down = True
+                if replica_down and node_in_replica:
+                    active = False
+            if not active:
+                break
+        return active
+
+    def node_is_live(self, node_name):
+        live_nodes = self.__zk.retry(self.__zk.get_children, 'live_nodes')
+        return (node_name in live_nodes)
+
+    def _remove_live_node(self, node_name):
+        # self.__zk.retry(self.__zk.delete, 'live_nodes/' + node_name)
+        print 'Pretend to delete: ' + 'live_nodes/' + node_name
+        return 0
+
+    def _restart_host_solr_service(self, host):
+        restart_command = '/usr/bin/sudo /sbin/restart solr-undertow'
+        print 'Pretend to: ' + 'ssh ' + host + " '" + restart_command + "'"
+        return 0
+
+    def restart_host_solr(self, host, host_port='8983', force=False):
+        if host is None:
+            return self._return_message(1, 'host is required')
+
+        node_name = host + ':' + host_port + '_solr'
+        if (not force) and (not self.node_is_live(node_name)):
+            return self._return_message(10, 'Node is not live')
+
+        # Don't restart if any other replicas are down
+        if (not force) and (not self.replicas_are_active(node_name)):
+            return self._return_message(20, 'Not all replicas are not active')
+
+        # LATER Make sure a reindex isn't in progress
+
+        if self._remove_live_node(node_name) != 0:
+            return self._return_message(30, 'Error removing live node')
+
+        if self._restart_host_solr_service(host) != 0:
+            return self._return_message(40, 'Error restarting solr service')
+
+    def _return_message(self, error_code, message):
+        return {'status': error_code, 'message': message}
 
 
-# @excludehosts
 @task
-def dashaction(screen_name, script, script_params=None):
-    command = actionscript(script, script_params, True)
-    # print("Running %s") % (command)
-    dashcommand(command, screen_name, True)
+def solrRestart():
+    scman = SolrCloudManager(args.zkhost)
+    # Only supports restart_host_solr operation
+    results = scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force)
+
+    print results
