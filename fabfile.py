@@ -69,16 +69,16 @@ class SolrCloudManager:
 
     def _remove_live_node(self, node_name):
         print(green('Deleting: live_nodes/%s' % (node_name)))
-        # self.__zk.retry(self.__zk.delete, 'live_nodes/' + node_name)
-        return 1
+        self.__zk.retry(self.__zk.delete, 'live_nodes/' + node_name)
+        return True
 
     def _restart_host_solr_service(self, host):
         print(green('Restarting: %s' % (host)))
-        result = sudo("echo '/sbin/restart solr-undertow'")
+        result = sudo("restart solr-undertow")
         if result.failed:
-            print(red('Faild to restart: %s' % (host)))
-            return 0
-        return 1
+            print(red('Failed to restart: %s' % (host)))
+            return False
+        return True
 
     def restart_host_solr(self, host, host_port='8983', force=False):
         if host is None:
