@@ -70,15 +70,15 @@ class SolrCloudManager:
     def _remove_live_node(self, node_name):
         print(green('Deleting: live_nodes/%s' % (node_name)))
         # self.__zk.retry(self.__zk.delete, 'live_nodes/' + node_name)
-        return 0
+        return 1
 
     def _restart_host_solr_service(self, host):
         print(green('Restarting: %s' % (host)))
         result = sudo("echo '/sbin/restart solr-undertow'")
         if result.failed:
             print(red('Faild to restart: %s' % (host)))
-            return 1
-        return 0
+            return 0
+        return 1
 
     def restart_host_solr(self, host, host_port='8983', force=False):
         if host is None:
@@ -109,12 +109,14 @@ class SolrCloudManager:
     def _return_message(self, error_code, message):
         return {'status': error_code, 'message': message}
 
+# env.hosts = []
 # env.shell = "/bin/bash -l -c"
 # env.use_shell = True
 # env.always_use_pty = True
 # env.zkhost = 'zookeeper-dev-1.build.internal:2181/solr/5.1.0/sandbox'
 # env.host_port = '8983'
 # env.force = False
+# env.user = 'fabric'
 # env.key_filename = '/path/to/key'
 env.reject_unknown_hosts = False
 env.disable_known_hosts = True
@@ -122,6 +124,7 @@ env.path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 
 @task
+@serial
 def solrRestart():
     scman = SolrCloudManager(env.zkhost)
     # Only supports restart_host_solr operation
