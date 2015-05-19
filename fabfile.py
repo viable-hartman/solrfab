@@ -4,7 +4,7 @@ from __future__ import with_statement
 
 import json
 from fabric.api import *
-# from fabric.colors import red, green
+from fabric.colors import red, green
 # from fabric.contrib import files
 # from functools import wraps
 # from kazoo.client import KazooState
@@ -51,15 +51,15 @@ class SolrCloudManager:
         return (node_name in live_nodes)
 
     def _remove_live_node(self, node_name):
+        print(green('Deleting: live_nodes/%s' % (node_name)))
         # self.__zk.retry(self.__zk.delete, 'live_nodes/' + node_name)
-        print 'Pretend to delete: ' + 'live_nodes/' + node_name
         return 0
 
     def _restart_host_solr_service(self, host):
-        # restart_command = '/usr/bin/sudo /sbin/restart solr-undertow'
-        print 'Restarting: %s' % (host)
+        print(green('Restarting: %s' % (host)))
         result = sudo("echo '/sbin/restart solr-undertow'")
         if result.failed:
+            print(red('Faild to restart: %s' % (host)))
             return 1
         return 0
 
@@ -104,4 +104,4 @@ def solrRestart():
     # Only supports restart_host_solr operation
     results = scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force)
 
-    print results
+    print(results)
