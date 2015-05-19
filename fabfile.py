@@ -132,4 +132,4 @@ env.path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 def solrRestart():
     scman = SolrCloudManager(env.zkhost)
     # Only supports restart_host_solr operation
-    scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force, ln_timeout=env.ln_timeout, rn_timeout=env.rn_timeout)
+    scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force, ln_timeout=int(env.ln_timeout), rn_timeout=int(env.rn_timeout))
