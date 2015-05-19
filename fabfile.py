@@ -2,6 +2,7 @@
 
 from __future__ import with_statement
 
+import sys
 import json
 import time
 from fabric.api import *
@@ -80,7 +81,7 @@ class SolrCloudManager:
             return False
         return True
 
-    def restart_host_solr(self, host, host_port='8983', force=False):
+    def restart_host_solr(self, host, host_port='8983', force=False, ln_timeout=240, rn_timeout=600):
         if host is None:
             return self._return_message(1, 'host is required')
 
@@ -90,7 +91,7 @@ class SolrCloudManager:
 
         # Don't restart if any other replicas are down
         if (not force) and (not self.replicas_are_active(node_name)):
-            return self._return_message(20, 'Not all replicas are not active')
+            return self._return_message(20, 'Not all replicas are active')
 
         # LATER Make sure a reindex isn't in progress
 
@@ -100,14 +101,15 @@ class SolrCloudManager:
         if not self._restart_host_solr_service(host):
             return self._return_message(40, 'Error restarting solr service')
 
-        if not self.wait_for_live_node(node_name, 240):
+        if not self.wait_for_live_node(node_name, ln_timeout):
             return self._return_message(50, 'Timeout waiting for live node')
 
-        if not self.wait_for_replicas(node_name, 600):
+        if not self.wait_for_replicas(node_name, rn_timeout):
             return self._return_message(60, 'Timeout waiting for replicas')
 
     def _return_message(self, error_code, message):
-        return {'status': error_code, 'message': message}
+        print(red({'status': error_code, 'message': message}))
+        sys.exit(error_code)
 
 # env.hosts = []
 # env.shell = "/bin/bash -l -c"
@@ -115,6 +117,8 @@ class SolrCloudManager:
 # env.always_use_pty = True
 # env.zkhost = 'zookeeper-dev-1.build.internal:2181/solr/5.1.0/sandbox'
 # env.host_port = '8983'
+# env.ln_timeout = 240
+# env.rn_timeout = 600
 # env.force = False
 # env.user = 'fabric'
 # env.key_filename = '/path/to/key'
@@ -128,6 +132,4 @@ env.path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 def solrRestart():
     scman = SolrCloudManager(env.zkhost)
     # Only supports restart_host_solr operation
-    results = scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force)
-
-    print(results)
+    scman.restart_host_solr(host=env.host, host_port=env.host_port, force=env.force, ln_timeout=env.ln_timeout, rn_timeout=env.rn_timeout)
