@@ -86,10 +86,16 @@ class SolrCloudManager:
     def _return_message(self, error_code, message):
         return {'status': error_code, 'message': message}
 
-env.zkhost = 'zookeeper-dev-1.build.internal:2181/solr/5.1.0/sandbox'
-env.host_port = '8983'
-env.force = False
-env.user = 'thartman'
+# env.shell = "/bin/bash -l -c"
+# env.use_shell = True
+# env.always_use_pty = True
+# env.zkhost = 'zookeeper-dev-1.build.internal:2181/solr/5.1.0/sandbox'
+# env.host_port = '8983'
+# env.force = False
+# env.key_filename = '/path/to/key'
+env.reject_unknown_hosts = False
+env.disable_known_hosts = True
+env.path = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 
 @task
