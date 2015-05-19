@@ -3,14 +3,12 @@
 from __future__ import with_statement
 
 import json
+import time
 from fabric.api import *
 from fabric.colors import red, green
 # from fabric.contrib import files
 # from functools import wraps
-# from kazoo.client import KazooState
 from kazoo.client import KazooClient
-
-# logging.getLogger('kazoo.client').addHandler(logging.StreamHandler())
 
 
 class SolrCloudManager:
@@ -46,9 +44,28 @@ class SolrCloudManager:
                 break
         return active
 
+    # Wait for all replicas to enter the active state
+    def wait_for_replicas(self, node_name, timeout):
+        start_time = time.time()
+        ra = self.replicas_are_active(node_name)
+        while ((start_time + timeout) > time.time()) and (not ra):
+            print "Waiting for replication to finish"
+            time.sleep(3)
+            ra = self.replicas_are_active(node_name)
+        return ra
+
     def node_is_live(self, node_name):
         live_nodes = self.__zk.retry(self.__zk.get_children, 'live_nodes')
         return (node_name in live_nodes)
+
+    def wait_for_live_node(self, node_name, timeout):
+        start_time = time.time()
+        lv = self.node_is_live(node_name)
+        while ((start_time + timeout) > time.time()) and (not lv):
+            print "Waiting for live node"
+            time.sleep(3)
+            lv = self.node_is_live(node_name)
+        return lv
 
     def _remove_live_node(self, node_name):
         print(green('Deleting: live_nodes/%s' % (node_name)))
@@ -77,11 +94,17 @@ class SolrCloudManager:
 
         # LATER Make sure a reindex isn't in progress
 
-        if self._remove_live_node(node_name) != 0:
+        if not self._remove_live_node(node_name):
             return self._return_message(30, 'Error removing live node')
 
-        if self._restart_host_solr_service(host) != 0:
+        if not self._restart_host_solr_service(host):
             return self._return_message(40, 'Error restarting solr service')
+
+        if not self.wait_for_live_node(node_name, 240):
+            return self._return_message(50, 'Timeout waiting for live node')
+
+        if not self.wait_for_replicas(node_name, 600):
+            return self._return_message(60, 'Timeout waiting for replicas')
 
     def _return_message(self, error_code, message):
         return {'status': error_code, 'message': message}
